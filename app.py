@@ -16,14 +16,14 @@ def extrair_informacoes(arquivo):
 
         # IDENTIFICAÇÃO DO EMITENTE
         identificacao_emitente_match = re.search(r"IDENTIFICAÇÃO DO EMITENTE[\s\S]*?(\n.+)", texto)
+        if not identificacao_emitente_match:
+            # Tenta uma alternativa comum de como a identificação pode ser apresentada
+            identificacao_emitente_match = re.search(r"Identificação do Emitente[\s\S]*?(\n.+)", texto)
         identificacao_emitente = identificacao_emitente_match.group(1).strip() if identificacao_emitente_match else "Não encontrado"
 
         # FATURA / DUPLICATA
-        faturas_matches = re.findall(r"Vencimento:\s(\d{2}/\d{2}/\d{4})[\s\S]*?Valor:\sR\$\s([\d.]*\,\d{2})", texto)
-        
-        if not faturas_matches:  # Tentativa de capturar um formato diferente no texto
-            faturas_matches = re.findall(r"Nº\s+\d+\s+Venc\.\s+(\d{2}/\d{2}/\d{2})\s+Vl\.\s+([\d.]+)", texto)
-
+        # Ajusta para capturar também casos onde o valor está em uma linha separada do vencimento
+        faturas_matches = re.findall(r"Nº\s+\d+\s+Venc.\s+(\d{2}/\d{2}/\d{2})\s+Vl.\s+([\d.]+)", texto)
         for data, valor in faturas_matches:
             valor_formatado = valor.replace(".", "").replace(",", ".")
             dados_faturas.append({
@@ -32,12 +32,13 @@ def extrair_informacoes(arquivo):
                 "Valor": valor_formatado
             })
 
-        # DATA DE EMISSÃO e VALOR TOTAL DA NOTA como fallback
+        # Se não encontrar FATURA / DUPLICATA, procura DATA DE EMISSÃO e VALOR TOTAL DA NOTA
         if not dados_faturas:
-            data_emissao_match = re.search(r"DATA DA EMISSÃO[\s\S]*?(\d{2}/\d{2}/\d{4})", texto)
-            valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA[\s\S]*?R\$\s*([\d.]+,\d{2})", texto)
-            if data_emissao_match and valor_total_nota_match:
-                data_emissao = data_emissao_match.group(1)
+            data_emissao_match = re.search(r"DATA DA EMISSÃO\s*?(\d{2}/\d{2}/\d{4})", texto)
+            data_emissao = data_emissao_match.group(1) if data_emissao_match else "Não disponível"
+            
+            valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA\s*R\$\s*([\d.]+,\d{2})", texto)
+            if valor_total_nota_match:
                 valor_total = valor_total_nota_match.group(1).replace(".", "").replace(",", ".")
                 dados_faturas.append({
                     "IDENTIFICAÇÃO DO EMITENTE": identificacao_emitente,
@@ -47,21 +48,7 @@ def extrair_informacoes(arquivo):
 
     return pd.DataFrame(dados_faturas)
 
-def to_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
-    processed_data = output.getvalue()
-    return processed_data
-
-def get_table_download_link(df):
-    val = to_excel(df)
-    b64 = base64.b64encode(val).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="extracao.xlsx">Download Excel</a>'
-    return href
-
-st.title('Extrator de Notas Fiscais')
-
+# Código Streamlit para upload de arquivos e exibição de resultados
 uploaded_files = st.file_uploader("Escolha os arquivos PDF", accept_multiple_files=True, type='pdf')
 if uploaded_files:
     dataframe_final = pd.DataFrame()
@@ -71,6 +58,5 @@ if uploaded_files:
 
     if not dataframe_final.empty:
         st.write(dataframe_final)
-        st.markdown(get_table_download_link(dataframe_final), unsafe_allow_html=True)
     else:
         st.error("Não foi possível extrair informações dos arquivos. Verifique o formato dos PDFs.")
