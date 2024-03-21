@@ -4,6 +4,7 @@ import pandas as pd
 import re
 import base64
 from io import BytesIO
+import openpyxl
 
 def processar_pdf(arquivo):
     dados_faturas = []
