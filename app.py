@@ -12,31 +12,26 @@ def processar_pdf(arquivo):
     
     for pagina in doc:
         texto = pagina.get_text()
-        # Aqui você insere a lógica de processamento do PDF, como feito anteriormente
-        # Exemplo básico:
-        identificacao_emitente_match = re.search(r"IDENTIFICAÇÃO DO EMITENTE[\s\S]*?(\n.+)", texto)
-        identificacao_emitente = identificacao_emitente_match.group(1).strip() if identificacao_emitente_match else "Não encontrado"
+        # Inclua aqui sua lógica de processamento de texto extraído
         
-        valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA[\s\S]*?R\$ ([\d.]*\,?\d*)", texto)
-        valor_total = valor_total_nota_match.group(1).replace(".", "").replace(",", ".") if valor_total_nota_match else "0.00"
-        
-        # Apenas um exemplo de dado adicionado
-        dados_faturas.append({"IDENTIFICAÇÃO DO EMITENTE": identificacao_emitente, "Valor": valor_total})
+        # Exemplo simplificado de adição de dados ao DataFrame
+        dados_faturas.append({"IDENTIFICAÇÃO DO EMITENTE": "Exemplo Emitente", "Valor": "100.00"})
     
     return pd.DataFrame(dados_faturas)
 
 def to_excel(df):
     output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='openpyxl')
-    df.to_excel(writer, index=False)
-    writer.save()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
     processed_data = output.getvalue()
     return processed_data
 
 def get_table_download_link(df):
+    """Gera um link para download do DataFrame como um arquivo Excel."""
     val = to_excel(df)
-    b64 = base64.b64encode(val).decode()  # Valores codificados em base64
-    return f'<a href="data:application/octet-stream;base64,{b64}" download="extracao.xlsx">Download do arquivo Excel</a>'
+    b64 = base64.b64encode(val).decode()  # Transforma bytes em base64 (string)
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="extracao.xlsx">Download Excel</a>'
+    return href
 
 st.title('Extrator de Notas Fiscais')
 
