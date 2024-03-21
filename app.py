@@ -6,22 +6,21 @@ import base64
 from io import BytesIO
 import openpyxl
 
+
 def extrair_informacoes(arquivo):
     doc = fitz.open(stream=arquivo.read(), filetype="pdf")
     dados_faturas = []
 
     for pagina in doc:
         texto = pagina.get_text()
-        # Debugging: Imprime o texto extraído para verificar seu conteúdo
-        st.write("Texto extraído da página:")
-        st.write(texto)
 
         # IDENTIFICAÇÃO DO EMITENTE
         identificacao_emitente_match = re.search(r"IDENTIFICAÇÃO DO EMITENTE[\s\S]*?(\n.+)", texto)
         identificacao_emitente = identificacao_emitente_match.group(1).strip() if identificacao_emitente_match else "Não encontrado"
 
-        # FATURA / DUPLICATA - Verificar se a estrutura corresponde exatamente ao seu PDF
+        # FATURA / DUPLICATA
         faturas_matches = re.findall(r"Vencimento:\s(\d{2}/\d{2}/\d{4})[\s\S]*?Valor:\sR\$\s([\d.]*\,\d{2})", texto)
+        
         if not faturas_matches:  # Tentativa de capturar um formato diferente no texto
             faturas_matches = re.findall(r"Nº\s+\d+\s+Venc\.\s+(\d{2}/\d{2}/\d{2})\s+Vl\.\s+([\d.]+)", texto)
 
@@ -33,8 +32,8 @@ def extrair_informacoes(arquivo):
                 "Valor": valor_formatado
             })
 
+        # DATA DE EMISSÃO e VALOR TOTAL DA NOTA como fallback
         if not dados_faturas:
-            # Se não encontrar FATURA / DUPLICATA, procura DATA DE EMISSÃO e VALOR TOTAL DA NOTA
             data_emissao_match = re.search(r"DATA DA EMISSÃO[\s\S]*?(\d{2}/\d{2}/\d{4})", texto)
             valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA[\s\S]*?R\$\s*([\d.]+,\d{2})", texto)
             if data_emissao_match and valor_total_nota_match:
@@ -47,7 +46,6 @@ def extrair_informacoes(arquivo):
                 })
 
     return pd.DataFrame(dados_faturas)
-
 
 def to_excel(df):
     output = BytesIO()
@@ -71,6 +69,8 @@ if uploaded_files:
         df_temp = extrair_informacoes(uploaded_file)
         dataframe_final = pd.concat([dataframe_final, df_temp], ignore_index=True)
 
-    st.write(dataframe_final)
-
-    st.markdown(get_table_download_link(dataframe_final), unsafe_allow_html=True)
+    if not dataframe_final.empty:
+        st.write(dataframe_final)
+        st.markdown(get_table_download_link(dataframe_final), unsafe_allow_html=True)
+    else:
+        st.error("Não foi possível extrair informações dos arquivos. Verifique o formato dos PDFs.")
