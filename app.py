@@ -12,29 +12,33 @@ def extrair_informacoes(arquivo):
 
     for pagina in doc:
         texto = pagina.get_text()
+        # Debugging: Imprime o texto extraído para verificar seu conteúdo
+        st.write("Texto extraído da página:")
+        st.write(texto)
 
         # IDENTIFICAÇÃO DO EMITENTE
         identificacao_emitente_match = re.search(r"IDENTIFICAÇÃO DO EMITENTE[\s\S]*?(\n.+)", texto)
         identificacao_emitente = identificacao_emitente_match.group(1).strip() if identificacao_emitente_match else "Não encontrado"
 
-        # Tentar extrair FATURA / DUPLICATA
+        # FATURA / DUPLICATA - Verificar se a estrutura corresponde exatamente ao seu PDF
         faturas_matches = re.findall(r"Vencimento:\s(\d{2}/\d{2}/\d{4})[\s\S]*?Valor:\sR\$\s([\d.]*\,\d{2})", texto)
+        if not faturas_matches:  # Tentativa de capturar um formato diferente no texto
+            faturas_matches = re.findall(r"Nº\s+\d+\s+Venc\.\s+(\d{2}/\d{2}/\d{2})\s+Vl\.\s+([\d.]+)", texto)
 
-        if faturas_matches:
-            for data, valor in faturas_matches:
-                valor_formatado = valor.replace(".", "").replace(",", ".")
-                dados_faturas.append({
-                    "IDENTIFICAÇÃO DO EMITENTE": identificacao_emitente,
-                    "Data da fatura": data,
-                    "Valor": valor_formatado
-                })
-        else:
+        for data, valor in faturas_matches:
+            valor_formatado = valor.replace(".", "").replace(",", ".")
+            dados_faturas.append({
+                "IDENTIFICAÇÃO DO EMITENTE": identificacao_emitente,
+                "Data da fatura": data,
+                "Valor": valor_formatado
+            })
+
+        if not dados_faturas:
             # Se não encontrar FATURA / DUPLICATA, procura DATA DE EMISSÃO e VALOR TOTAL DA NOTA
-            data_emissao_match = re.search(r"DATA DE EMISSÃO[\s\S]*?(\d{2}/\d{2}/\d{4})", texto)
-            data_emissao = data_emissao_match.group(1) if data_emissao_match else "Não disponível"
-            
-            valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA[\s\S]*?([\d.]+,\d{2})", texto)
-            if valor_total_nota_match:
+            data_emissao_match = re.search(r"DATA DA EMISSÃO[\s\S]*?(\d{2}/\d{2}/\d{4})", texto)
+            valor_total_nota_match = re.search(r"VALOR TOTAL DA NOTA[\s\S]*?R\$\s*([\d.]+,\d{2})", texto)
+            if data_emissao_match and valor_total_nota_match:
+                data_emissao = data_emissao_match.group(1)
                 valor_total = valor_total_nota_match.group(1).replace(".", "").replace(",", ".")
                 dados_faturas.append({
                     "IDENTIFICAÇÃO DO EMITENTE": identificacao_emitente,
@@ -43,6 +47,7 @@ def extrair_informacoes(arquivo):
                 })
 
     return pd.DataFrame(dados_faturas)
+
 
 def to_excel(df):
     output = BytesIO()
